@@ -172,3 +172,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Audit files
+audit.jsonl
+
+# Report files
+audit_report.md
+top_functions.png

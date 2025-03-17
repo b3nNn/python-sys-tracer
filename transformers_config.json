@@ -1,0 +1,14 @@
+{
+    "version": "0.0.1",
+    "filters": [
+        {
+            "name": "transformers",
+            "files": ["*"],
+            "modules": [
+                "transformers.*"
+            ],
+            "functions": ["*"],
+            "classes": ["*"]
+        }
+    ]
+}

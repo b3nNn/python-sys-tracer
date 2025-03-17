@@ -1,0 +1,5 @@
+jsonschema>=4.23.0
+jsonpickle>=4.0.2
+numpy>=1.26.4
+pathspec>=0.12.1
+matplotlib>=3.10.1
