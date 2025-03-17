@@ -1,20 +1,13 @@
 import datetime
-import decimal
-import dis
-import inspect
 import json
-import os
 import sys
-import types
-from typing import Any, Mapping, Sequence
 import jsonpickle
-import numpy as np
 import pathspec
-
 import json
 from dataclasses import dataclass
 from typing import List
 import jsonschema
+from tracer.stream import FileStreamWriter
 
 # Define the Filter dataclass
 @dataclass
@@ -124,6 +117,10 @@ class Tracer:
             else:  # If 'self' is an instance
                 class_name = obj.__class__.__name__
 
+        # Skip Tracer and FileStreamWriter
+        if class_name is not None and (class_name == 'Tracer' or class_name == 'FileStreamWriter'):
+            return self
+
         if module_name is None or not self.modules_spec.match_entries(module_name):
             # print(f"{module_name} not in {str(self.modules)}")
             return self
@@ -137,7 +134,7 @@ class Tracer:
             "module": module_name,
         }
 
-        self.append_to_file(metadata)
+        self.writer.write(f"{jsonpickle.encode(metadata, warn=False)}\n")
 
         uid = f'{module_name}.{class_name}.{method_name}'
         if uid not in self.visited:
@@ -146,29 +143,14 @@ class Tracer:
 
         return self
 
-    def append_to_file(self, metadata):
-        try:
-            with open(self.jsonl_file, "a", encoding="utf-8") as fd:
-                fd.write(f"{jsonpickle.encode(metadata, warn=False)}\n")
-        except:
-            print("io error")
-            pass
-
     def _read_config(self, config: Config):
         modules = [module for filter_obj in config.filters for module in filter_obj.modules]
         self.modules_spec = pathspec.PathSpec.from_lines('gitwildmatch', modules)
 
-    def __init__(self, jsonl_file, config: Config):
+    def __init__(self, writer: FileStreamWriter, config: Config):
+        self.writer = writer
         self._read_config(config)
         self.visited = list[str]()
-        self.fd = None
-        self.jsonl_file = jsonl_file
-
-        if os.path.exists(jsonl_file):
-            os.remove(jsonl_file)
-        with open(self.jsonl_file, "a", encoding="utf-8"):
-            pass
-
 
     def __enter__(self):
         sys.settrace(self.trace_func)
@@ -178,7 +160,9 @@ class Tracer:
         pass
 
     def __exit__(self, exc_type, exc_value, traceback):
-        pass
+        self.writer.flush()
 
     def __del__(self):
+        self.writer.flush()
         sys.settrace(None)
+

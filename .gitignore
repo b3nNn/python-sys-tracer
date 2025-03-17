@@ -175,6 +175,7 @@ cython_debug/
 
 # Audit files
 audit.jsonl
+audit.jsonl.lock
 
 # Report files
 audit_report.md
