@@ -9,19 +9,27 @@ class FileStreamWriter:
 
     def __enter__(self):
         """Open the file in append mode when entering the context."""
-        self.file = open(self.filename, 'a')
+        with self.lock:
+            try:
+                self.file = open(self.filename, 'a')
+            except:
+                raise SystemError("File is not open")
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Close the file when exiting the context."""
         if self.file:
             self.file.close()
+            self.file = None
 
     def write(self, content):
         """Write content to the file, synchronized with a file lock."""
-        if self.file is None:
-            raise ValueError("File is not open")
         with self.lock:
+            if self.file is None:
+                try:
+                    self.file = open(self.filename, 'a')
+                except:
+                    raise SystemError("File is not open")
             self.file.write(content)
 
     def flush(self):
