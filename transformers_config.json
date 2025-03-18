@@ -5,14 +5,14 @@
             "name": "transformers",
             "files": ["*"],
             "modules": ["transformers", "transformers.*"],
-            "functions": ["*"],
+            "functions": ["*", "!__*", "!_*", "!<*>", "!convert_", "!to_", "!*_dtype_to_*"],
             "classes": ["*"]
         },
         {
             "name": "torch",
             "files": ["*"],
-            "modules": ["torch", "torch.*"],
-            "functions": ["*"],
+            "modules": ["torch", "torch.*", "!torch._*", "!torch.serialization"],
+            "functions": ["*", "!__*", "!_*", "!<*>", "!children", "!named_children", "!state_dict", "!named_modules"],
             "classes": ["*"]
         }
     ]

@@ -24,6 +24,15 @@ class Config:
     version: str
     filters: List[Filter]
 
+# Define the Filter dataclass
+@dataclass
+class TracerFilter:
+    name: str
+    files_spec: pathspec.PathSpec
+    modules_spec: pathspec.PathSpec
+    functions_spec: pathspec.PathSpec
+    classes_spec: pathspec.PathSpec
+
 # Define the configuration schema
 CONFIG_SCHEMA = {
     "type": "object",
@@ -101,14 +110,9 @@ class Tracer:
 
         file_name = frame.f_code.co_filename
         line_number = frame.f_lineno
-
-        # Get the method name
         method_name = frame.f_code.co_name
-
-        # Get the module name
         module_name = frame.f_globals.get('__name__', None)
         
-        # Try to get the class of the object (if it's an instance method)
         class_name = None
         if 'self' in frame.f_locals:
             obj = frame.f_locals['self']
@@ -117,21 +121,17 @@ class Tracer:
             else:  # If 'self' is an instance
                 class_name = obj.__class__.__name__
 
-        # Skip Tracer and FileStreamWriter
-        if class_name is not None:
+        if self._do_ignore_class(class_name):
             return self
 
-        is_matching_spec = False
-        try:
-            is_matching_spec = self.modules_spec.match_file(module_name)
-        except:
-            pass
+        ok, filter = self._get_filter(module_name, file_name, class_name, method_name)
 
-        if module_name is None or not is_matching_spec:
+        if not ok:
             return self
 
         metadata = {
             "timestamp": datetime.datetime.utcnow().isoformat(),
+            "filter": filter.name,
             "file": file_name,
             "line": line_number,
             "function": method_name,
@@ -149,15 +149,61 @@ class Tracer:
         return self
 
     def _read_config(self, config: Config):
-        modules = [module for filter_obj in config.filters for module in filter_obj.modules]
-        modules.append("!Tracer")
-        modules.append("!FileStreamWriter")
-        self.modules_spec = pathspec.PathSpec.from_lines('gitwildmatch', modules)
+        for filter in config.filters:
+            files = list(filter.files) if filter.files else []
+            if len(files) == 0:
+                files.append("*")
+
+            modules = list(filter.modules) if filter.modules else []
+            if len(modules) == 0:
+                modules.append("*")
+
+            functions = list(filter.functions) if filter.functions else []
+            if len(functions) == 0:
+                functions.append("*")
+
+            classes = list(filter.classes) if filter.classes else []
+            if len(classes) == 0:
+                classes.append("*")
+
+            self.filters.append(
+                TracerFilter(filter.name,
+                             pathspec.PathSpec.from_lines('gitwildmatch', files),
+                             pathspec.PathSpec.from_lines('gitwildmatch', modules),
+                             pathspec.PathSpec.from_lines('gitwildmatch', functions),
+                             pathspec.PathSpec.from_lines('gitwildmatch', classes)
+                             )
+                        )
+
+    def _do_ignore_class(self, class_name):
+        if class_name is None:
+            return False
+        
+        return class_name in self._ignore_classes
+
+    def _get_filter(self, module_name, file_name, class_name, function_name) -> tuple[bool, TracerFilter]:
+        for filter in self.filters:
+            try:
+                if module_name is not None and not filter.modules_spec.match_file(module_name):
+                    continue
+                if file_name is not None and not filter.files_spec.match_file(file_name):
+                    continue
+                if class_name is not None and not filter.classes_spec.match_file(class_name):
+                    continue
+                if function_name is not None and not filter.functions_spec.match_file(function_name):
+                    continue
+            except:
+                continue
+
+            return True, filter
+        return False, None
 
     def __init__(self, writer: FileStreamWriter, config: Config):
         self.writer = writer
-        self._read_config(config)
         self.visited = list[str]()
+        self.filters = list[TracerFilter]()
+        self._ignore_classes = ["Tracer", "FileStreamWriter"]
+        self._read_config(config)
 
     def __enter__(self):
         sys.settrace(self.trace_func)
