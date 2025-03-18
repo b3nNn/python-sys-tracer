@@ -4,9 +4,14 @@
         {
             "name": "transformers",
             "files": ["*"],
-            "modules": [
-                "transformers.*"
-            ],
+            "modules": ["transformers", "transformers.*"],
+            "functions": ["*"],
+            "classes": ["*"]
+        },
+        {
+            "name": "torch",
+            "files": ["*"],
+            "modules": ["torch", "torch.*"],
             "functions": ["*"],
             "classes": ["*"]
         }

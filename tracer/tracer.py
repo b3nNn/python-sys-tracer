@@ -118,11 +118,16 @@ class Tracer:
                 class_name = obj.__class__.__name__
 
         # Skip Tracer and FileStreamWriter
-        if class_name is not None and (class_name == 'Tracer' or class_name == 'FileStreamWriter'):
+        if class_name is not None:
             return self
 
-        if module_name is None or not self.modules_spec.match_entries(module_name):
-            # print(f"{module_name} not in {str(self.modules)}")
+        is_matching_spec = False
+        try:
+            is_matching_spec = self.modules_spec.match_file(module_name)
+        except:
+            pass
+
+        if module_name is None or not is_matching_spec:
             return self
 
         metadata = {
@@ -145,6 +150,8 @@ class Tracer:
 
     def _read_config(self, config: Config):
         modules = [module for filter_obj in config.filters for module in filter_obj.modules]
+        modules.append("!Tracer")
+        modules.append("!FileStreamWriter")
         self.modules_spec = pathspec.PathSpec.from_lines('gitwildmatch', modules)
 
     def __init__(self, writer: FileStreamWriter, config: Config):
@@ -163,6 +170,5 @@ class Tracer:
         self.writer.flush()
 
     def __del__(self):
-        self.writer.flush()
         sys.settrace(None)
 
